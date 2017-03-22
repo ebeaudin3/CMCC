@@ -6,10 +6,9 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/contrib/time_axis_labels.ncl"
 
 begin
 
-	data = addfile("data/dataset-global-reanalysis-phy-001-025-01012004_31122004.nc","r")
-	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01021998_31031998.nc","r")
+	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01091994_31081996.nc","r")
+	data = addfile("data/dataset-global-reanalysis-phy-001-025-01021998_31031998.nc","r")
 	;data = addfile("data/dataset-global-reanalysis-phy-001-025-31121992_31122003_T&U&V.nc","r")
-	;data = addfile("data/dataset-global-reanalysis-phy-001-025-30121992_29122015_region2.nc","r")
 	
 	; temperature time series
 	TAB = str_get_tab()
@@ -38,7 +37,6 @@ begin
 	mm	= floattointeger(time(:,1))		; month
 	dd	= floattointeger(time(:,2))		; day of month
 
-
 	lat_UpB =  2				; coordinates of the analyzed section
 	lat_LoB =  -2				; in east and north
 	lon_LeB =   2
@@ -50,7 +48,10 @@ begin
 
 
 ; *********************** PLOT MEAN VELOCITY VS TIME ******************************************
-	wks 					= gsn_open_wks("x11","SPDvst")
+	
+	file_title 				= ""+dd(0)+"-"+mm(0)+"-"+yyyy(0)+"_"+dd(dimsizes(dd)-1)+"-"+mm(dimsizes(dd)-1)+"-"+yyyy(dimsizes(dd)-1)+""
+	
+	wks 					= gsn_open_wks("x11","vec_"+file_title)
 
 	mean_u 					= transpose(dim_avg_n(dim_avg_n(u(:,LoB:UpB,LeB:RiB),1),1))
 	mean_v 					= transpose(dim_avg_n(dim_avg_n(v(:,LoB:UpB,LeB:RiB),1),1))
@@ -71,10 +72,10 @@ begin
 	resV@vpWidthF 				= 0.94
 	resV@vpHeightF 				= (2./3.)*resV@vpWidthF
 	
-	resV@tiXAxisString 			= "Days since "+dd(0)+"-"+mm(0)+"-"+yyyy(0)+""
+	;resV@tiXAxisString 			= "Days since "+dd(0)+"-"+mm(0)+"-"+yyyy(0)+""
 	resV@tiMainString 			= "Mean Current Magnitude and Direction ~C~"+mm(0)+"/"+dd(0)+"/"+yyyy(0)+" to "+mm(dimsizes(mm)-1)+"/"+dd(dimsizes(mm)-1)+"/"+yyyy(dimsizes(mm)-1)+"~C~"+lat_UpB+"~S~o~N~N to "+lat_LoB+"~S~o~N~N, "+lon_LeB+"~S~o~N~E to "+lon_RiB+"~S~o~N~E "
 	resV@tiXAxisFontHeightF 		= 0.015
-	resV@tiMainFontHeightF 			= 0.018
+	resV@tiMainFontHeightF 			= 0.028
 	resV@tiMainOffsetXF			= -0.2
 	resV@tiMainOffsetYF			= 0.04
 	resV@tmXBLabelFontHeightF		= 0.015
@@ -85,13 +86,13 @@ begin
 	;resV@vcMinFracLengthF 			= 0
 	resV@vcGlyphStyle 			= "LineArrow"
 	resV@vcMapDirection 			= False
-	resV@vcLineArrowThicknessF 		= 2.5
+	resV@vcLineArrowThicknessF 		= 0.5
 	resV@vcPositionMode 			= "ArrowTail"
 	resV@vcRefAnnoOn 			= True		; Turns on reference vector box (default = True)
-	resV@vcRefAnnoOrthogonalPosF 		= -.15		; Moves reference vector box inside the plot
+	resV@vcRefAnnoOrthogonalPosF 		= .15		; Moves reference vector box inside the plot
 	resV@vcRefAnnoPerimOn 			= False
 	resV@vcRefAnnoString2 			= ""
-	resV@vcRefAnnoSide			= "Right"
+	resV@vcRefAnnoSide			= "Up"
 
 	resV@tmYLMode             		= "Explicit"	; Tick Marks/Labels
 	resV@tmYLValues           		= (/0,1,2/)
@@ -99,18 +100,61 @@ begin
 	resV@tmYLLabelAngleF      		= 90.
 	resV@tmYLLabelJust        		= "CenterCenter"
 	resV@tmYLLabelFontHeightF 		= 0.015
-	;resV@tmXBMode             		= "Explicit"	; Tick Marks/Labels
-	;resV@tmXBValues           		= (/0,150,300/)
-	;resV@tmXBLabels           		= (/"","",""/)
 	
-	resV@sfXArray 	 = time_d
+
+	; --------------- TIME TICK FUNCTION -------------------------------------------
+	maxlen = 40
+	posx = new(maxlen,integer)
+	i=0
+	j=0
+	mon = (/"jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"/)
+	if dimsizes(dd).ge.(365*3) then ; year tick
+		tickx = new(maxlen,integer)
+		do while (i.le.dimsizes(dd)-1)
+			if dd(i).eq.1 .and. mm(i).eq.1 .or. i.eq.(dimsizes(dd)-1)
+				posx(j) = i
+				tickx(j) = yyyy(i)
+				if i.eq.(dimsizes(dd)-1) then tickx(j) = yyyy(i)+1 end if
+				j = j+1
+			end if
+			i=i+1
+		end do
+	else 		; month-year tick
+		tickx = new(maxlen,string)
+		do while (i.le.dimsizes(dd)-1)
+			if dd(i).eq.1 .or. i.eq.(dimsizes(dd)-1)
+				posx(j) = i
+				y_tick = yyyy(i) - floattoint(yyyy(i)/100)*100
+				if y_tick.le.10 then zero="0"
+				else zero=""
+				end if
+				tickx(j) = ""+mon(mm(i)-1)+""+zero+""+y_tick+""
+				if i.eq.(dimsizes(dd)-1) then
+					k=0
+					if mm(i).eq.12 then
+						k=-11
+						y_tick = y_tick+1
+					end if
+					tickx(j) = ""+mon(mm(i)-1+k)+""+zero+""+y_tick+""
+				end if
+				j = j+1
+			end if
+			i=i+1
+		end do
+	end if
+
+	resV@tmXBMode             		= "Explicit"	; Tick Marks/Labels
+	resV@tmXBValues           		= posx(0:j)
+	resV@tmXBLabels           		= tickx(0:j)
+	
+	; ---------------- END TIME TICK FUNCTION ---------------------------------------
+
 	
 	; these four resources allow the user to stretch the plot size, and
 	; decide exactly where on the page to draw it.
-
 	 resV@gsnMaximize = True
-	 resV@vpHeightF = 0.3        ; Changes the aspect ratio
-	 resV@vpWidthF  = 0.9
+	 resV@vpHeightF = 0.6        ; Changes the aspect ratio
+	 resV@vpWidthF  = 2.5
 
 	;restick = True
 	;restick@ttmFormat = "%d%c"

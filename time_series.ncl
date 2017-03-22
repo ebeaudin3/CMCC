@@ -6,8 +6,8 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRFUserARW.ncl"
 begin
 
 	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01011993_31121997_T.nc","r")
-	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01021998_31031998.nc","r")
-	data = addfile("data/dataset-global-reanalysis-phy-001-025-31121992_31122003_T&U&V.nc","r")
+	data = addfile("data/dataset-global-reanalysis-phy-001-025-30121992_29122015_-5.-12N_8.12E.nc","r")
+	;data = addfile("data/dataset-global-reanalysis-phy-001-025-31121992_31122003_T&U&V.nc","r")
 	;data = addfile("data/dataset-global-reanalysis-phy-001-025-30121992_29122015_region2.nc","r")
 	
 	; temperature time series
@@ -37,17 +37,19 @@ begin
 	dd	= floattointeger(time(:,2))		; day of month
 
 
-	lat_UpB =  2				; coordinates of the analyzed section
-	lat_LoB =  -2				; in east and north
-	lon_LeB =   2
-	lon_RiB =   10
+	lat_UpB =  -8				; coordinates of the analyzed section
+	lat_LoB =  -12				; in degrees east and north
+	lon_LeB =   8
+	lon_RiB =   12
 	UpB = ind(lat.eq.lat_UpB)		; Upper Boundary
 	LoB = ind(lat.eq.lat_LoB)		; Lower Boundary
 	LeB = ind(lon.eq.lon_LeB)		; Left  Boundary
 	RiB = ind(lon.eq.lon_RiB)		; Right Boundary
 
 ; *********************** PLOT TEMPERATURE VS TIME *******************************************
-	wks 					= gsn_open_wks("x11","Tvst")
+	file_title 				= ""+dd(0)+"-"+mm(0)+"-"+yyyy(0)+"_"+dd(dimsizes(dd)-1)+"-"+mm(dimsizes(dd)-1)+"-"+yyyy(dimsizes(dd)-1)+"_"+lat_UpB+"N."+lat_LoB+"N."+lon_LeB+"E."+lon_RiB+"E"
+	
+	wks 					= gsn_open_wks("ps","msst_"+file_title)
 
 	res 					= True
 
@@ -73,20 +75,70 @@ begin
 	end do
 
 	res@tiMainString 			= "Mean Sea Surface Temperature"
+	res@tiMainFontHeightF 			= 0.018
 	res@tiXAxisString 			= ""
 	res@tiYAxisString 			= "Temperature (~S~o~N~C)"
 	res@tiYAxisFontHeightF 			= 0.018
-	res@tiXAxisString 			= "Days since "+dd(0)+"-"+mm(0)+"-"+yyyy(0)+""
-	res@tiMainOffsetYF 			= 0.03
+	;res@tiXAxisString 			= "Days since "+dd(0)+"-"+mm(0)+"-"+yyyy(0)+""
+	res@tiMainOffsetYF 			= 0.02
 	res@xyMarkLineModes 			= "Markers"
 	res@xyMarkerColor 			= "black"
 	res@xyMarkers 				= 16
 	res@xyMarkerSizeF 			= 0.005
 
-	;res@tmXBMode        = "Manual"	
-	;res@tmXBTickStartF  = yyyy(0)
-	;res@tmXBTickEndF    = yyyy(dimsizes(yyyy)-1)
-	;res@tmXBTickSpacingF= 1
+
+; --------------- TIME TICK FUNCTION -------------------------------------------
+	maxlen = 40
+	posx = new(maxlen,integer)
+	i=0
+	j=0
+	mon = (/"jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"/)
+	if dimsizes(dd).ge.(365*3) then ; year tick
+		tickx = new(maxlen,integer)
+		do while (i.le.dimsizes(dd)-1)
+			if dd(i).eq.1 .and. mm(i).eq.1 .or. i.eq.(dimsizes(dd)-1)
+				posx(j) = i
+				tickx(j) = yyyy(i)
+				if i.eq.(dimsizes(dd)-1) then tickx(j) = yyyy(i)+1 end if
+				j = j+1
+			end if
+			i=i+1
+		end do
+	else 		; month-year tick
+		tickx = new(maxlen,string)
+		do while (i.le.dimsizes(dd)-1)
+			if dd(i).eq.1 .or. i.eq.(dimsizes(dd)-1)
+				posx(j) = i
+				y_tick = yyyy(i) - floattoint(yyyy(i)/100)*100
+				if y_tick.le.10 then zero="0"
+				else zero=""
+				end if
+				tickx(j) = ""+mon(mm(i)-1)+""+zero+""+y_tick+""
+				if i.eq.(dimsizes(dd)-1) then
+					k=0
+					if mm(i).eq.12 then
+						k=-11
+						y_tick = y_tick+1
+					end if
+					tickx(j) = ""+mon(mm(i)-1+k)+""+zero+""+y_tick+""
+				end if
+				j = j+1
+			end if
+			i=i+1
+		end do
+	end if
+
+	res@tmXBMode             		= "Explicit"	; Tick Marks/Labels
+	res@tmXBValues           		= posx(0:j)
+	res@tmXBLabels           		= tickx(0:j)
+	
+	; ---------------- END TIME TICK FUNCTION ---------------------------------------
+
+	;res@trXMinF     = 0        ; set minimum X-axis value
+	res@trXMaxF     = dimsizes(dd)-1        ; set maximum X-axis value
+	res@gsnMaximize 			= True
+	res@vpHeightF 				= 0.3        ; Changes the aspect ratio
+	res@vpWidthF  				= 1.3
 
 	mean_T 					= dim_avg_n(dim_avg_n(temp(:,LoB:UpB,LeB:RiB),1),1)
 
