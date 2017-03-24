@@ -6,13 +6,13 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/contrib/time_axis_labels.ncl"
 
 begin
 
-	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01091994_31081996.nc","r")
-	data = addfile("data/dataset-global-reanalysis-phy-001-025-01021998_31031998.nc","r")
+	data = addfile("data/dataset-global-reanalysis-phy-001-025-01091994_31081996.nc","r")
+	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01021998_31031998.nc","r")
 	;data = addfile("data/dataset-global-reanalysis-phy-001-025-31121992_31122003_T&U&V.nc","r")
 	
 	; temperature time series
 	TAB = str_get_tab()
-		
+	
 
 ; *********************** DATA *****************************************************************
 
@@ -57,15 +57,43 @@ begin
 	mean_v 					= transpose(dim_avg_n(dim_avg_n(v(:,LoB:UpB,LeB:RiB),1),1))
 	mean_spd				= transpose(dim_avg_n(dim_avg_n(spd(:,LoB:UpB,LeB:RiB),1),1))
 
-	row 					= 3
-	col 					= dimsizes(mean_u(:,0))
 
-	U   					= new((/row,col/),float)
-	V   					= U
-	stick_pos  				= 1
-	U(stick_pos,:) 				= mean_u(:,0)
-	V(stick_pos,:) 				= mean_v(:,0)
-	  
+	; ------- temporal average ------- ;
+	
+	time_average = 3 			; 0: daily, 1: monthly, 2: yearly, 3: bi-mensual, 4: 4-annual
+	row = 3
+	col = dimsizes(mean_u(:,0))
+	U  = new((/row,col/),float)
+	V  = U
+	stick_pos = 0
+
+	if (time_average.ge.1) then
+		if (time_average.eq.1) then 		; monthly
+			val_ind = ind(dd.eq.1)
+		else if (time_average.eq.2) then	; yearly
+			val_ind = ind(dd.eq.1 .and. mm.eq.1)
+		else if (time_average.eq.3) then	; bi-mensual
+			val_ind = ind((dd.eq.1 .or. dd.eq.15))
+		else if (time_average.eq.4) then	; 4-annual
+			val_ind = ind(dd.eq.1 .and. (mm.eq.1 .or. mm.eq.4 .or. mm.eq.7 .or. mm.eq.10))
+		end if
+		end if
+		end if
+		end if
+		i=0
+		do while i.le.(dimsizes(val_ind)-2)
+			U(stick_pos,val_ind(i)) = avg(mean_u(val_ind(i):val_ind(i+1),0))
+			V(stick_pos,val_ind(i)) = avg(mean_v(val_ind(i):val_ind(i+1),0))
+			i=i+1
+		end do
+	else if (time_average.eq.0) then		; daily
+		U(stick_pos,:)	= mean_u(:,0)
+		V(stick_pos,:) 	= mean_v(:,0)
+
+	end if
+	end if
+
+; ---------------------- graphic resources ------------------------------------------ ;
 	resV 					= True
 
 	resV@vpXF 				= 0.04
@@ -74,25 +102,23 @@ begin
 	
 	;resV@tiXAxisString 			= "Days since "+dd(0)+"-"+mm(0)+"-"+yyyy(0)+""
 	resV@tiMainString 			= "Mean Current Magnitude and Direction ~C~"+mm(0)+"/"+dd(0)+"/"+yyyy(0)+" to "+mm(dimsizes(mm)-1)+"/"+dd(dimsizes(mm)-1)+"/"+yyyy(dimsizes(mm)-1)+"~C~"+lat_UpB+"~S~o~N~N to "+lat_LoB+"~S~o~N~N, "+lon_LeB+"~S~o~N~E to "+lon_RiB+"~S~o~N~E "
-	resV@tiXAxisFontHeightF 		= 0.015
-	resV@tiMainFontHeightF 			= 0.028
+	resV@tiMainFontHeightF 			= 0.015
+	resV@tiXAxisFontHeightF 		= 0.15
 	resV@tiMainOffsetXF			= -0.2
 	resV@tiMainOffsetYF			= 0.04
-	resV@tmXBLabelFontHeightF		= 0.015
 
-
-	resV@vcRefMagnitudeF 			= 0.5
+	resV@vcRefMagnitudeF 			= 0.2		; arrows resources
 	resV@vcRefLengthF 			= 0.08
-	;resV@vcMinFracLengthF 			= 0
 	resV@vcGlyphStyle 			= "LineArrow"
 	resV@vcMapDirection 			= False
-	resV@vcLineArrowThicknessF 		= 0.5
+	resV@vcLineArrowThicknessF 		= 0.9
 	resV@vcPositionMode 			= "ArrowTail"
 	resV@vcRefAnnoOn 			= True		; Turns on reference vector box (default = True)
 	resV@vcRefAnnoOrthogonalPosF 		= .15		; Moves reference vector box inside the plot
 	resV@vcRefAnnoPerimOn 			= False
-	resV@vcRefAnnoString2 			= ""
-	resV@vcRefAnnoSide			= "Up"
+	resV@vcRefAnnoString1 			= ""+resV@vcRefMagnitudeF+" m/s"
+	resV@vcRefAnnoString2			= ""
+	;resV@vcRefAnnoSide			= "Up"
 
 	resV@tmYLMode             		= "Explicit"	; Tick Marks/Labels
 	resV@tmYLValues           		= (/0,1,2/)
@@ -100,7 +126,17 @@ begin
 	resV@tmYLLabelAngleF      		= 90.
 	resV@tmYLLabelJust        		= "CenterCenter"
 	resV@tmYLLabelFontHeightF 		= 0.015
-	
+	resV@tmXBLabelFontHeightF		= 0.015
+
+	resV@tmXBBorderOn      = True		; background
+	resV@tmXBOn            = True
+	resV@tmXTBorderOn      = False
+	resV@tmXTOn            = False
+	resV@tmYLBorderOn      = False
+	resV@tmYLOn            = False
+	resV@tmYRBorderOn      = False
+	resV@tmYROn            = False
+
 
 	; --------------- TIME TICK FUNCTION -------------------------------------------
 	maxlen = 40
@@ -108,7 +144,7 @@ begin
 	i=0
 	j=0
 	mon = (/"jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"/)
-	if dimsizes(dd).ge.(365*3) then ; year tick
+	if dimsizes(dd).ge.(365*2) then ; year tick
 		tickx = new(maxlen,integer)
 		do while (i.le.dimsizes(dd)-1)
 			if dd(i).eq.1 .and. mm(i).eq.1 .or. i.eq.(dimsizes(dd)-1)
@@ -153,8 +189,8 @@ begin
 	; these four resources allow the user to stretch the plot size, and
 	; decide exactly where on the page to draw it.
 	 resV@gsnMaximize = True
-	 resV@vpHeightF = 0.6        ; Changes the aspect ratio
-	 resV@vpWidthF  = 2.5
+	 resV@vpHeightF = 0.1        ; Changes the aspect ratio ;0.6-2.5
+	 resV@vpWidthF  = 0.8		; bien pour 10 ans: 0.1-0.8
 
 	;restick = True
 	;restick@ttmFormat = "%d%c"
