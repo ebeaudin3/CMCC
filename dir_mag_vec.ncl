@@ -6,9 +6,9 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/contrib/time_axis_labels.ncl"
 
 begin
 
-	data = addfile("data/dataset-global-reanalysis-phy-001-025-01091994_31081996.nc","r")
+	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01091994_31081996.nc","r")
 	;data = addfile("data/dataset-global-reanalysis-phy-001-025-01021998_31031998.nc","r")
-	;data = addfile("data/dataset-global-reanalysis-phy-001-025-31121992_31122003_T&U&V.nc","r")
+	data = addfile("data/dataset-global-reanalysis-phy-001-025-31121992_31122003_T&U&V.nc","r")
 	
 	; temperature time series
 	TAB = str_get_tab()
@@ -51,17 +51,17 @@ begin
 	
 	file_title 				= ""+dd(0)+"-"+mm(0)+"-"+yyyy(0)+"_"+dd(dimsizes(dd)-1)+"-"+mm(dimsizes(dd)-1)+"-"+yyyy(dimsizes(dd)-1)+""
 	
-	wks 					= gsn_open_wks("x11","vec_"+file_title)
+	wks 					= gsn_open_wks("ps","vec_"+file_title+"_3-annual_avr")
 
 	mean_u 					= transpose(dim_avg_n(dim_avg_n(u(:,LoB:UpB,LeB:RiB),1),1))
 	mean_v 					= transpose(dim_avg_n(dim_avg_n(v(:,LoB:UpB,LeB:RiB),1),1))
 	mean_spd				= transpose(dim_avg_n(dim_avg_n(spd(:,LoB:UpB,LeB:RiB),1),1))
 
 
-	; ------- temporal average ------- ;
-	
-	time_average = 3 			; 0: daily, 1: monthly, 2: yearly, 3: bi-mensual, 4: 4-annual
-	row = 3
+	; ------- temporal average ------- ;	
+
+	time_average = 6 			; 0: daily, 1: monthly, 2: yearly, 3: bi-mensual
+	row = 3					; 4: 4-annual, 5: bi-annual, 6: 3-annual
 	col = dimsizes(mean_u(:,0))
 	U  = new((/row,col/),float)
 	V  = U
@@ -76,14 +76,26 @@ begin
 			val_ind = ind((dd.eq.1 .or. dd.eq.15))
 		else if (time_average.eq.4) then	; 4-annual
 			val_ind = ind(dd.eq.1 .and. (mm.eq.1 .or. mm.eq.4 .or. mm.eq.7 .or. mm.eq.10))
+		else if (time_average.eq.5) then	; bi-annual
+			val_ind = ind(dd.eq.1 .and. (mm.eq.1 .or. mm.eq.7))
+		else if (time_average.eq.6) then	; 3-annual
+			val_ind = ind(dd.eq.1 .and. (mm.eq.1 .or. mm.eq.5 .or. mm.eq.9))
+		end if
+		end if
 		end if
 		end if
 		end if
 		end if
 		i=0
-		do while i.le.(dimsizes(val_ind)-2)
-			U(stick_pos,val_ind(i)) = avg(mean_u(val_ind(i):val_ind(i+1),0))
-			V(stick_pos,val_ind(i)) = avg(mean_v(val_ind(i):val_ind(i+1),0))
+
+		do while i.le.(dimsizes(val_ind)-1)
+			if i.eq.(dimsizes(val_ind)-1) then
+				ind_fin = dimsizes(mean_u(:,0))-1
+			else ind_fin = val_ind(i+1)
+			end if
+			U(stick_pos,val_ind(i)) = avg(mean_u(val_ind(i):ind_fin,0))
+			
+			V(stick_pos,val_ind(i)) = avg(mean_v(val_ind(i):ind_fin,0))
 			i=i+1
 		end do
 	else if (time_average.eq.0) then		; daily

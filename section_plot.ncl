@@ -109,7 +109,7 @@ begin
 		resT@cnMinLevelValF = 12.0
 		resT@cnMaxLevelValF = 32.4
 
-		plot(0) = gsn_csm_contour_map(wks,dim_avg_n(temp(:,:,lat_ind,:),0),resT)
+		plot(0) = gsn_csm_contour(wks,dim_avg_n(temp(:,:,lat_ind,:),0),resT)
 
 
 
@@ -172,7 +172,7 @@ begin
 
 ; --------------------- Draw panel ---------------------------------------
 		
-		gsn_panel(wks,plot,(/4,1/),False)
+		gsn_panel(wks,plot,(/2,2/),False)
 
 
 

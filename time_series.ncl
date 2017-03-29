@@ -47,7 +47,7 @@ begin
 	RiB = ind(lon.eq.lon_RiB)		; Right Boundary
 
 
-	;--------- El Nino indices ----------;
+	;--------- El Nino indices read ----------;
 	data_nino = asciiread("../noaa/sstoi.indices",-1,"float")
 	nrow = 422
 	elNino = new((/nrow,10/),"float")
@@ -74,13 +74,50 @@ begin
 	do while i.le.(dimsizes(dd)-1)
 		ind_1 = ind(yyyy(i).eq.elNino(:,0) .and. mm(i).eq.elNino(:,1))
 		if ind_1.gt.ind_2 then
-			Nino(i+14,:) = elNino(ind_1,:) ; 8: Nino3.4 temperature
+			Nino(i,:) = elNino(ind_1,:) ; 8: Nino3.4 temperature
 			ind_2=ind_1
 		end if
 		i=i+1
 	end do
 	;-------- END Nino indices ----------;
-	
+
+	ano=1
+	if ano.eq.1 then
+		;****************** Compute Anomaly ****************;
+		; 1st step: seasonal cycle -------------------------;
+		mon_mean_T = new((/12,dimsizes(lat),dimsizes(lon)/),"float")
+		i=1	
+		do while i.le.12 	; loop over 12 months
+			mon_inds = ind(mm.eq.i) ; find indices of corresponding months
+			mon_mean_T(i-1,:,:) = dim_avg_n(temp(mon_inds,:,:),0)
+			delete(mon_inds)
+		i=i+1
+		end do
+		; 2nd step: difference between mean and value ------;
+		ano_temp = new(dimsizes(temp),"float")
+		i=0
+		do while i.le.(dimsizes(dd)-1)	;loop over all dataset (ndays)
+			ano_temp(i,:,:) = temp(i,:,:)-mon_mean_T(mm(i)-1,:,:)
+		i=i+1
+		end do
+		; 3rd step: montlhy mean anomaly -------------------;
+		mon_mean_ano = new(dimsizes(temp),"float")
+		i=0
+		m=1
+		ind0=0
+		ind1=0
+		do while i.le.(dimsizes(dd)-2)
+			;print("m(i)
+			if mm(i).ne.mm(i+1) then
+				ind1 = i
+				mon_mean_ano(i,:,:) = dim_avg_n(ano_temp(ind0:ind1,:,:),0)
+				ind0=i+1
+			end if			
+			i=i+1
+		end do
+
+
+	end if ; if ano
 
 
 ; --------------- TIME TICK FUNCTION -------------------------------------------
@@ -134,11 +171,10 @@ begin
 		dateF(n) = dateF(n-1)+1
 	end do
 
-	mean_T 					= dim_avg_n(dim_avg_n(temp(:,LoB:UpB,LeB:RiB),1),1)
-
+	
 ; **************************** GRAPHIC RESOURCES ******************************
 	file_title 				= ""+dd(0)+"-"+mm(0)+"-"+yyyy(0)+"_"+dd(dimsizes(dd)-1)+"-"+mm(dimsizes(dd)-1)+"-"+yyyy(dimsizes(dd)-1)+"_"+lat_UpB+"N."+lat_LoB+"N."+lon_LeB+"E."+lon_RiB+"E"
-	wks 					= gsn_open_wks("png","msst_"+file_title+"Nino3.4_Nino1+2")
+	wks 					= gsn_open_wks("ps","msst_"+file_title+"Nino3.4_Nino1+2")
 
 	res 					= True
 
@@ -168,7 +204,7 @@ begin
 	res@pmLegendHeightF        		= 0.05                	; height of legend.
 	res@lgPerimOn              		= False               	; turn off box around
 	res@lgLabelFontHeightF     		= .01                 	; label font height
-	res@xyExplicitLegendLabels 		= "SST Angola"         	; create explicit labels
+	res@xyExplicitLegendLabels 		= "SSTA Angola"         	; create explicit labels
 	
 	
 	res@tmXBMode             		= "Explicit"		; Tick Marks/Labels
@@ -176,35 +212,58 @@ begin
 	res@tmXBLabels           		= tickx(0:j)
 	
 	res@trXMaxF    				= dimsizes(dd)-1        ; set maximum X-axis value
-	res@trYMaxF				= 32
+	if ano.eq.1 then
+		res@trYMaxF			= 4
+		res@trYMinF			= -res@trYMaxF
+	else
+		res@trYMaxF				= 32
+	end if
 	res@gsnMaximize 			= True
 	res@vpHeightF 				= 0.3        		; Changes the aspect ratio
 	res@vpWidthF  				= 1.3
 	
-	res@gsnLeftString  			= " From "+mm(0)+"/"+dd(0)+"/"+yyyy(0)+" to "+mm(dimsizes(mm)-1)+"/"+dd(dimsizes(mm)-1)+"/"+yyyy(dimsizes(mm)-1)+" ~C~ range=["+min(mean_T)+","+max(mean_T)+"]"
+	if ano.ne.1 then
+		res@gsnLeftString  			= " From "+mm(0)+"/"+dd(0)+"/"+yyyy(0)+" to "+mm(dimsizes(mm)-1)+"/"+dd(dimsizes(mm)-1)+"/"+yyyy(dimsizes(mm)-1)+" ~C~ range=["+min(mean_T)+","+max(mean_T)+"]"
+	end if
 
 	res@xyLineThicknesses 			= 1.5
  	res@xyLineColors      			= "blue"
 	
 
 ; ------------ overlay el nino 3.4 index ------------------------------
-	plotRA = gsn_csm_xy(wks,dateF,mean_T,res)
+	mean_T 					= dim_avg_n(dim_avg_n(temp(:,LoB:UpB,LeB:RiB),1),1)
+
+	mean_ano				= dim_avg_n(dim_avg_n(mon_mean_ano(:,LoB:UpB,LeB:RiB),1),1)
+
+	;print(dimsizes(mon_mean_ano))
+	;print(dimsizes(mean_ano))
+	;print(mean_ano)
+
+	index_no_msg = ind(.not.ismissing(mean_ano))
+
+	if ano.eq.1 then
+		res@gsnLeftString  			= " From "+mm(0)+"/"+dd(0)+"/"+yyyy(0)+" to "+mm(dimsizes(mm)-1)+"/"+dd(dimsizes(mm)-1)+"/"+yyyy(dimsizes(mm)-1)+" ~C~ range=["+min(mean_ano(index_no_msg))+","+max(mean_ano(index_no_msg))+"]"
+	end if
 	
-	res@xyExplicitLegendLabels 		= "SST El Nino 3.4"         	; create explicit labels
+	plotRA = gsn_csm_xy(wks,dateF(index_no_msg),mean_ano(index_no_msg),res)
+	;plotRA = gsn_csm_xy(wks,dateF,mean_T,res)
+	
+	res@xyExplicitLegendLabels 		= "SSTA El Nino 3.4"         	; create explicit labels
 	res@pmLegendParallelPosF   		= res@pmLegendParallelPosF-0.05; move units right
 	res@xyLineThicknesses 			= 1.0
 	res@xyLineColors      			= "red"
 	
-	index_no_msg = ind(.not.ismissing(Nino(:,8)))
-	plotNino34 = gsn_csm_xy(wks,dateF(index_no_msg),Nino(index_no_msg,8),res)
+	delete(index_no_msg)
+	index_no_msg = ind(.not.ismissing(Nino(:,9)))
+	plotNino34 = gsn_csm_xy(wks,dateF(index_no_msg),Nino(index_no_msg,9),res)
 	
 
-	res@xyExplicitLegendLabels 		= "SST El Nino 1+2"         	; create explicit labels
+	res@xyExplicitLegendLabels 		= "SSTA El Nino 1+2"         	; create explicit labels
 	res@pmLegendParallelPosF   		= res@pmLegendParallelPosF-0.05; move units right
 	res@xyLineThicknesses 			= 1.0
 	res@xyLineColors      			= "green"
 	
-	plotNino12 = gsn_csm_xy(wks,dateF(index_no_msg),Nino(index_no_msg,4),res)
+	plotNino12 = gsn_csm_xy(wks,dateF(index_no_msg),Nino(index_no_msg,5),res)
 	
 
 	overlay(plotRA,plotNino34)
